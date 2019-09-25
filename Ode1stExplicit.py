@@ -23,7 +23,7 @@ class Ode1stExplicit(ABC):
     
     We'll compute the value and sensitivity for you automatically.
     """
-    def __init__ (self, dim_y, dim_p, method="RK45"):
+    def __init__ (self, dim_y, dim_p, dim_z, method="RK45"):
         self.dim_y = dim_y
         self.dim_p = dim_p
         self.method = method
@@ -42,6 +42,12 @@ class Ode1stExplicit(ABC):
         Jacobian of f
         """
         pass
+
+    @abstractmethod
+    def I1(self, t, y, p):
+        """
+        Value of I1. Row vector with d = dim_z
+        """
 
     ## Forward Integration ####################################################
     def computeValue(self, t0, t1, y0):
@@ -108,6 +114,25 @@ class Ode1stExplicit(ABC):
         else:
             raise RuntimeError("Dimension of p doesn't match. Cannot set p to new value.")
 
+    @property
+    def dim_z(self):
+        return self._dim_z
     
+    @dim_z.setter
+    def dim_z(self, value):
+        self._dim_z = value
+        self._z = np.zeros(value)  # Variable of interest
+
+    @property
+    def z(self):
+        return self._z
+    
+    @z.setter
+    def z(self, value):
+        new_z = np.array(value)
+        if new_z.shape == self._z.shape:
+            self._z = new_z
+        else:
+            raise RuntimeError("Dimension of z doesn't match. Cannot set z to new value.")
 
     
