@@ -107,8 +107,8 @@ class Ode1stExplicit(ABC):
         """
         y = y_aux[:self.dim_y]
         y_aux_dot = np.zeros(self.dim_y+self.dim_z)
-        y_aux_dot[:self.dim_y] = self.f(t, y)
-        y_aux_dot[self.dim_y:] = self.I2(t,y)
+        y_aux_dot[:self.dim_y] = self.f(t, y).flatten()
+        y_aux_dot[self.dim_y:] = self.I2(t,y).flatten()
         return y_aux_dot
 
     def rhs_adjoint(self, t, y_aux):
@@ -124,16 +124,16 @@ class Ode1stExplicit(ABC):
         z = y_aux[self.dim_y:self.dim_y+self.dim_z]
         
         # Compute y_dot
-        y_aux_dot[0:self.dim_y] = self.f(t,y)
+        y_aux_dot[0:self.dim_y] = self.f(t,y).flatten()
         # Compute z_dot
-        y_aux_dot[self.dim_y:self.dim_y+self.dim_z] = self.I2(t, y)
+        y_aux_dot[self.dim_y:self.dim_y+self.dim_z] = self.I2(t, y).flatten()
         # Compute lambda_dot
         l_index = self.dim_y+self.dim_z
         dh_dy_t = -self.fj(t, y).T
         dI2dy = self.dI2dy(t, y)
         for i in range(self.dim_z):
             l_i = y_aux[l_index:l_index+self.dim_y].reshape(self.dim_y, 1)
-            l_i_dot = dI2dy[i,:] + dh_dy_t.dot(l_i)
+            l_i_dot = dI2dy[i,:].flatten() + dh_dy_t.dot(l_i).flatten()
             y_aux_dot[l_index:l_index+self.dim_y] = l_i_dot
             l_index += self.dim_y
         # Compute dz_i/dp_j_dot
