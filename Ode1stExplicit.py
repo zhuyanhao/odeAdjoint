@@ -27,6 +27,7 @@ class Ode1stExplicit(ABC):
         self.dim_y = dim_y
         self.dim_p = dim_p
         self.dim_z = dim_z
+        self._l = np.zeros(dim_z*dim_y)
         self.dzdp = np.zeros((dim_z, dim_p))
         self.method = method
 
@@ -121,7 +122,6 @@ class Ode1stExplicit(ABC):
         # Getting value from auxilary states
         y = y_aux[0:self.dim_y]
         z = y_aux[self.dim_y:self.dim_y+self.dim_z]
-        # l = y_aux[self.dim_y+self.dim_z:self.dim_y+self.dim_z+dim_l]
         
         # Compute y_dot
         y_aux_dot[0:self.dim_y] = self.f(t,y)
@@ -129,11 +129,11 @@ class Ode1stExplicit(ABC):
         y_aux_dot[self.dim_y:self.dim_y+self.dim_z] = self.I2(t, y)
         # Compute lambda_dot
         l_index = self.dim_y+self.dim_z
-        dh_dx_t = -self.fj(t, y).T
+        dh_dy_t = -self.fj(t, y).T
         dI2dy = self.dI2dy(t, y)
         for i in range(self.dim_z):
             l_i = y_aux[l_index:l_index+self.dim_y].reshape(self.dim_y, 1)
-            l_i_dot = dI2dy[i,:] + dh_dx_t.dot(l_i)
+            l_i_dot = dI2dy[i,:] + dh_dy_t.dot(l_i)
             y_aux_dot[l_index:l_index+self.dim_y] = l_i_dot
             l_index += self.dim_y
         # Compute dz_i/dp_j_dot
@@ -143,7 +143,7 @@ class Ode1stExplicit(ABC):
         dhdp = -self.fp(t, y)
         for i in range(self.dim_z):
             l_i = y_aux[l_index:l_index+self.dim_y].reshape(1, self.dim_y)
-            dzdp_i = dI2dp[i].reshape(self.dim_p, 1) + l_i.dot(dhdp)
+            dzdp_i = dI2dp[i].flatten() + l_i.dot(dhdp).flatten()
             y_aux_dot[zp_index:zp_index+self.dim_p] = dzdp_i
             l_index += self.dim_y
             zp_index += self.dim_p
@@ -181,8 +181,36 @@ class Ode1stExplicit(ABC):
         """
         Backward integration to compute the value of sensitivity
         """
-        self.computeValue(t0, t1, y0)  # Compute self.y = y_1
+        self.computeValue(t0, t1, y0)  # Compute y (state) and z (variable)
 
+        # y_aux = [y, z, lambda, dz/dp]
+        dim_l = self.dim_z * self.dim_y
+        dim_zp = self.dim_z * self.dim_p
+        y_aux = np.zeros(self.dim_y + self.dim_z + dim_l + dim_zp)
+        y_aux[:self.dim_y] = self.y
+        y_aux[self.dim_y:self.dim_y+self.dim_z] = self.z
+        y_aux[self.dim_y+self.dim_z:self.dim_y+self.dim_z+dim_l] = \
+            -self.dI1dy(t1, self.y).flatten()
+        y_aux[self.dim_y+self.dim_z+dim_l:] = -self.dI1dp(t1, self.y).flatten()
+
+        # Integrate backward
+        sol = solve_ivp(
+            fun = self.rhs_adjoint,
+            t_span = (t1, t0),
+            y0 = y_aux,
+            method = self.method,
+            vectorized = False,
+            dense_output = True,
+            )
+        
+
+        if not sol.success:
+            raise RuntimeError("Integration Fails.")
+
+        y_aux = sol.y[:,-1]   # Get the last column
+        self.l = y_aux[self.dim_y+self.dim_z:self.dim_y+self.dim_z+dim_l]
+        self.dzdp = -y_aux[self.dim_y+self.dim_z+dim_l:].reshape(self.dim_z, self.dim_p)
+        return sol
 
     ## Property ###############################################################
     @property
@@ -194,7 +222,6 @@ class Ode1stExplicit(ABC):
         assert (value > 0)
         self._dim_y = value
         self._y = np.zeros(value)  # State
-        self._l = np.zeros(value)  # Adjoint variable
 
     @property
     def dim_p(self):
