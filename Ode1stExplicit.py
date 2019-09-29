@@ -121,7 +121,6 @@ class Ode1stExplicit(ABC):
         
         # Getting value from auxilary states
         y = y_aux[0:self.dim_y]
-        z = y_aux[self.dim_y:self.dim_y+self.dim_z]
         
         # Compute y_dot
         y_aux_dot[0:self.dim_y] = self.f(t,y).flatten()
@@ -155,7 +154,6 @@ class Ode1stExplicit(ABC):
         """
         Forward integration to compute the value of states
         """
-        assert len(y0) == self.dim_y
         y_aux = np.zeros(self.dim_y+self.dim_z)
         y_aux[:self.dim_y] = y0
 
