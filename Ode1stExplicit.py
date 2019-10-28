@@ -200,6 +200,7 @@ class Ode1stExplicit(ABC):
             method = self.method,
             vectorized = False,
             dense_output = True,
+            max_step = (t1 - t0) / 20,
             )
         
 
